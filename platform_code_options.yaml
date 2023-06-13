@@ -1,0 +1,38 @@
+platform_types:
+  - xiaomi
+  - huawei
+  - oppo
+  - vivo
+  - other_android
+  - iphone
+  - mac
+  - windows
+  - linux
+  - web
+
+union_types:
+  android:
+    - xiaomi
+    - huawei
+    - oppo
+    - vivo
+    - other_android
+
+  ios:
+    - iphone
+    - mac
+
+  mobile:
+    - android
+    - iphone
+
+  desktop:
+    - windows
+    - linux
+    - mac
+
+  native:
+    - mobile
+    - desktop
+
+current_platform: xiaomi
