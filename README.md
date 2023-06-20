@@ -89,8 +89,21 @@ const PlatformSpec({
 在`platform_code_options.yaml`中增加类型：
 
 ### 基本平台类型
-
+在`platform_types`节点下以数组形式声明所有基本平台类型，形如：
+```yaml
+platform_types:
+  - android
+  - ios
+  - desktop
+  - web
+```
 ### 组合平台类型
+在`union_types`节点下以字典形式声明组合平台类型，形如：
+```yaml
+union_types:
+  mobile: [android, ios]
+  native: [mobile, desktop]  # 注意，由于上面先定义了mobile类型，所以这里才可以使用
+```
 
 # 当前支持替换的语法元素
 
@@ -110,3 +123,37 @@ const PlatformSpec({
 
   > 更多语法支持可以通过在`lib/builder/platform_generator.dart`中增加`visitXXX`系列的方法覆写来实现。
 
+# 向项目中集成的步骤
+1. clone本仓库
+2. 复制`platform_code_builder`目录至目标项目的根目录
+3. 编辑目标项目的`pubspec.yaml`，添加如下内容
+    ```yaml
+    dependencies:
+      ……
+      platform_code_builder:
+        path: platform_code_builder
+    
+    dev_dependencies:
+      ……
+      build_runner: ^<latest_version>
+    ```
+4. 在项目根目录创建`platform_code_options.yaml`，根据项目需要定义所有平台类型
+5. 定义完成后，在项目根目录依次如下命令：
+    ```shell
+    dart pub get
+    ddart run build_runner build
+    ```
+   完成后请检查生成的`platform_code_builder/lib/platform_type.dart`文件内容无误
+6. 在项目源码中使用注解标记不同平台下的代码，参考[注解使用说明](#注解使用说明)
+7. (可选)，创建`bin/handle_platform.dart`，用于为指定平台执行特殊操作，基础代码如下：
+    ```dart
+    import 'package:platform_code_builder/platform_type.dart';
+    
+    main(List<String> args) {
+      var platformMaskCode = PlatformType.fromName(args.first);
+      /// 在这里判断platformMaskCode执行所需操作
+    }
+
+    ```
+8. 运行`ddart run build_runner build`或`ddart run build_runner watch`，并将项目中相关的import源码路径更改为生成的`*.p.dart`
+9. 运行Flutter/Dart项目，检查结果是否符合预期
