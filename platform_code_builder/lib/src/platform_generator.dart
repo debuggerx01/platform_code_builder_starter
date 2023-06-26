@@ -12,6 +12,7 @@ import 'package:_fe_analyzer_shared/src/scanner/token.dart' show StringToken;
 // ignore: implementation_imports
 import 'package:analyzer/src/source/source_resource.dart' show FileSource;
 import 'package:build/build.dart';
+import 'package:chalkdart/chalk.dart';
 import 'package:collection/collection.dart';
 import 'package:lakos/lakos.dart';
 import 'package:platform_code_builder/platform_type.dart';
@@ -46,6 +47,8 @@ class PlatformGenerator extends GeneratorForAnnotation<PlatformDetector> {
   final int platformTypeMaskCode;
   final List<Edge> allImports;
 
+  final _warnedSource = Set<String>();
+
   PlatformGenerator(
     this.platformTypeMaskCode,
     this.allImports,
@@ -56,11 +59,12 @@ class PlatformGenerator extends GeneratorForAnnotation<PlatformDetector> {
       Element element, ConstantReader annotation, BuildStep buildStep) {
     var file = (element.source as FileSource).file;
     var hasImport = allImports.where((edge) => file.path.endsWith(edge.to));
-    if (hasImport.isNotEmpty) {
-      List<String> exceptions = [];
+    if (hasImport.isNotEmpty && !_warnedSource.contains(file.path)) {
+      _warnedSource.add(file.path);
+      List<String> exceptions = [''];
       hasImport.forEach((ele) {
         exceptions.add(
-            '[WARN] Do not import [lib${ele.to}] directly in [lib${ele.from}], use [lib${ele.to.replaceFirst('.dart', '.p.dart')}] instead!');
+            '${chalk.yellow('[WARNING]')} Do not import [lib${ele.to}] directly in [lib${ele.from}], use [lib${ele.to.replaceFirst('.dart', '.p.dart')}] instead!');
       });
       stderr.writeln(exceptions.join('\n'));
     }

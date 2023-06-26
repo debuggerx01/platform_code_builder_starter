@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:build/build.dart';
+import 'package:chalkdart/chalk.dart';
 import 'package:code_builder/code_builder.dart' hide LibraryBuilder;
 import 'package:dart_style/dart_style.dart';
 import 'package:lakos/lakos.dart';
@@ -111,8 +112,16 @@ String? buildTypes() {
   );
   var platformTypeSourceCode =
       DartFormatter().format('${platformTypeClass.accept(DartEmitter())}');
-  File('./platform_code_builder/lib/platform_type.dart')
-      .writeAsStringSync(platformTypeSourceCode);
+  var file = File('./platform_code_builder/lib/platform_type.dart');
+  var platformTypeContent = file.readAsStringSync();
+  if (platformTypeContent != platformTypeSourceCode) {
+    file.writeAsStringSync(platformTypeSourceCode);
+    stderr.writeln(
+        '${chalk.yellow('[WARNING]')} [platform_code_builder/lib/platform_type.dart] generated!');
+    stderr.writeln(
+        '${chalk.yellow('[WARNING]')} Please run the build runner again!');
+    exit(1);
+  }
 
   return yaml['current_platform'];
 }
