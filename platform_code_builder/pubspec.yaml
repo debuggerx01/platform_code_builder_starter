@@ -12,6 +12,7 @@ dependencies:
   yaml: any
   code_builder: any
   dart_style: any
+  lakos: any
 
 dev_dependencies:
   build_runner: any

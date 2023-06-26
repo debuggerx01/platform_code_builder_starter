@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:math';
 
 import 'package:analyzer/dart/analysis/utilities.dart';
@@ -9,7 +10,7 @@ import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/src/source/source_resource.dart' show FileSource;
 import 'package:build/build.dart';
 import 'package:collection/collection.dart';
-import 'package:dart_style/dart_style.dart';
+import 'package:lakos/lakos.dart';
 import 'package:platform_code_builder/platform_type.dart';
 import 'package:source_gen/source_gen.dart';
 
@@ -28,15 +29,27 @@ int parsePlatformTypeExpression(String exp) {
 
 class PlatformGenerator extends GeneratorForAnnotation<PlatformDetector> {
   final int platformTypeMaskCode;
+  final List<Edge> allImports;
 
-  PlatformGenerator(this.platformTypeMaskCode);
+  PlatformGenerator(
+    this.platformTypeMaskCode,
+    this.allImports,
+  );
 
   @override
   generateForAnnotatedElement(
       Element element, ConstantReader annotation, BuildStep buildStep) {
-    var compilationUnit = parseString(
-            content: (element.source as FileSource).file.readAsStringSync())
-        .unit;
+    var file = (element.source as FileSource).file;
+    var hasImport = allImports.where((edge) => file.path.endsWith(edge.to));
+    if (hasImport.isNotEmpty) {
+      List<String> exceptions = [];
+      hasImport.forEach((ele) {
+        exceptions.add(
+            '[WARN] Do not import [lib${ele.to}] directly in [lib${ele.from}], use [lib${ele.to.replaceFirst('.dart', '.p.dart')}] instead!');
+      });
+      stderr.writeln(exceptions.join('\n'));
+    }
+    var compilationUnit = parseString(content: file.readAsStringSync()).unit;
     var _visitor = _Visitor(platformTypeMaskCode);
     compilationUnit.visitChildren(_visitor);
     var res = compilationUnit.toSource();
@@ -46,13 +59,13 @@ class PlatformGenerator extends GeneratorForAnnotation<PlatformDetector> {
     _visitor._renames.forEach((from, to) {
       res = res.replaceFirst(from, '\n$to\n');
     });
-    return DartFormatter(fixes: StyleFix.all).format(res);
+    return res;
   }
 }
 
 typedef HandleRename = String Function(String source, String renameTo);
 
-class _Visitor<R> extends RecursiveAstVisitor<R> {
+class _Visitor extends RecursiveAstVisitor<void> {
   final Set<String> _removes = {};
   final Map<String, String> _renames = {};
   final int platformTypeMaskCode;
@@ -99,73 +112,73 @@ class _Visitor<R> extends RecursiveAstVisitor<R> {
   }
 
   @override
-  R? visitClassDeclaration(ClassDeclaration node) {
+  visitClassDeclaration(ClassDeclaration node) {
     _handleNode(
       node,
       handleRename: (source, renameTo) => source.replaceFirst(
           'class ${node.name.toString()}', 'class $renameTo'),
     );
-    return super.visitClassDeclaration(node);
+    super.visitClassDeclaration(node);
   }
 
   @override
-  R? visitVariableDeclarationStatement(VariableDeclarationStatement node) {
+  visitVariableDeclarationStatement(VariableDeclarationStatement node) {
     _handleNode(
       node.variables,
       useParent: true,
       handleRename: (source, renameTo) => source.replaceFirst(
           node.variables.variables.first.name.toString(), renameTo),
     );
-    return super.visitVariableDeclarationStatement(node);
+    super.visitVariableDeclarationStatement(node);
   }
 
   @override
-  R? visitTopLevelVariableDeclaration(TopLevelVariableDeclaration node) {
+  visitTopLevelVariableDeclaration(TopLevelVariableDeclaration node) {
     _handleNode(
       node,
       handleRename: (source, renameTo) => source.replaceFirst(
           node.variables.variables.first.name.toString(), renameTo),
     );
-    return super.visitTopLevelVariableDeclaration(node);
+    super.visitTopLevelVariableDeclaration(node);
   }
 
   @override
-  R? visitFieldDeclaration(FieldDeclaration node) {
+  visitFieldDeclaration(FieldDeclaration node) {
     _handleNode(
       node,
       handleRename: (source, renameTo) => source.replaceFirst(
           node.fields.variables.first.name.toString(), renameTo),
     );
-    return super.visitFieldDeclaration(node);
+    super.visitFieldDeclaration(node);
   }
 
   @override
-  R? visitImportDirective(ImportDirective node) {
+  visitImportDirective(ImportDirective node) {
     _handleNode(
       node,
       handleRename: (source, renameTo) =>
           source.replaceFirst(node.uri.toSource(), "'$renameTo'"),
     );
-    return super.visitImportDirective(node);
+    super.visitImportDirective(node);
   }
 
   @override
-  R? visitFunctionDeclaration(FunctionDeclaration node) {
+  visitFunctionDeclaration(FunctionDeclaration node) {
     _handleNode(
       node,
       handleRename: (source, renameTo) =>
-          source.replaceFirst(node.name.toString(), renameTo),
+          source.replaceFirst(' ${node.name}(', ' $renameTo('),
     );
-    return super.visitFunctionDeclaration(node);
+    super.visitFunctionDeclaration(node);
   }
 
   @override
-  R? visitMethodDeclaration(MethodDeclaration node) {
+  visitMethodDeclaration(MethodDeclaration node) {
     _handleNode(
       node,
       handleRename: (source, renameTo) =>
-          source.replaceFirst(node.name.toString(), renameTo),
+          source.replaceFirst(' ${node.name}(', ' $renameTo('),
     );
-    return super.visitMethodDeclaration(node);
+    super.visitMethodDeclaration(node);
   }
 }

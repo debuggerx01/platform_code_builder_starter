@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:build/build.dart';
 import 'package:code_builder/code_builder.dart' hide LibraryBuilder;
 import 'package:dart_style/dart_style.dart';
+import 'package:lakos/lakos.dart';
 import 'package:platform_code_builder/platform_type.dart';
 import 'package:source_gen/source_gen.dart';
 import 'package:yaml/yaml.dart';
@@ -52,9 +53,13 @@ Builder platformBuilder(BuilderOptions options) {
   }
 
   return LibraryBuilder(
-    PlatformGenerator(platformMaskCode),
+    PlatformGenerator(
+      platformMaskCode,
+      buildModel(Directory('./lib'), showTree: false).edges,
+    ),
     generatedExtension: '.p.dart',
     header: '$defaultFileHeader\n// current platform is [$selectedPlatform]',
+    formatOutput: (code) => DartFormatter(fixes: StyleFix.all).format(code),
   );
 }
 
