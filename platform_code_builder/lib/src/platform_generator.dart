@@ -5,6 +5,9 @@ import 'package:analyzer/dart/analysis/utilities.dart';
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/dart/element/element.dart';
+import 'package:analyzer/dart/ast/syntactic_entity.dart';
+import 'package:analyzer/dart/ast/token.dart';
+import 'package:_fe_analyzer_shared/src/scanner/token.dart' show StringToken;
 
 // ignore: implementation_imports
 import 'package:analyzer/src/source/source_resource.dart' show FileSource;
@@ -25,6 +28,18 @@ int parsePlatformTypeExpression(String exp) {
   return parts
       .map((e) => PlatformType.fromName(e.split('.').last.trim()))
       .reduce((value, ele) => value | ele);
+}
+
+class CodeRange {
+  final int offset;
+  final int end;
+
+  const CodeRange(this.offset, this.end);
+
+  factory CodeRange.formEntry(SyntacticEntity entry) => CodeRange(
+        entry.offset,
+        entry.end,
+      );
 }
 
 class PlatformGenerator extends GeneratorForAnnotation<PlatformDetector> {
@@ -49,31 +64,41 @@ class PlatformGenerator extends GeneratorForAnnotation<PlatformDetector> {
       });
       stderr.writeln(exceptions.join('\n'));
     }
+    var parseStringResult = parseString(content: file.readAsStringSync());
     var compilationUnit = parseString(content: file.readAsStringSync()).unit;
     var _visitor = _Visitor(platformTypeMaskCode);
     compilationUnit.visitChildren(_visitor);
-    var res = compilationUnit.toSource();
-    for (var ele in _visitor._removes) {
-      res = res.replaceFirst(ele, '\n');
+    var res = parseStringResult.content;
+
+    _visitor._renames.addAll(
+      Map.fromIterables(
+        _visitor._removes,
+        List.generate(
+          _visitor._removes.length,
+          (index) => '',
+        ),
+      ),
+    );
+
+    var keys = _visitor._renames.keys.sorted((a, b) => b.end.compareTo(a.end));
+
+    for (var key in keys) {
+      res = res.replaceRange(key.offset, key.end, _visitor._renames[key]!);
     }
-    _visitor._renames.forEach((from, to) {
-      res = res.replaceFirst(from, '\n$to\n');
-    });
     return res;
   }
 }
 
-typedef HandleRename = String Function(String source, String renameTo);
+typedef HandleRename = Token Function();
 
 class _Visitor extends RecursiveAstVisitor<void> {
-  final Set<String> _removes = {};
-  final Map<String, String> _renames = {};
+  final Set<CodeRange> _removes = {};
+  final Map<CodeRange, String> _renames = {};
   final int platformTypeMaskCode;
 
   _Visitor(this.platformTypeMaskCode);
 
-  _handleNode(AnnotatedNode node,
-      {HandleRename? handleRename, useParent = false}) {
+  _handleNode(AnnotatedNode node, {HandleRename? handleRename}) {
     if (node.metadata.isNotEmpty) {
       var annotation = node.metadata
           .singleWhereOrNull((element) => element.name.name == 'PlatformSpec');
@@ -91,21 +116,20 @@ class _Visitor extends RecursiveAstVisitor<void> {
             ? false
             : ((_not as NamedExpression).expression as BooleanLiteral).value;
 
-        var _source = (useParent ? node.parent! : node).toString();
         if (platformTypeMaskCode.binaryMatch(parsePlatformTypeExpression(
                 (_platformType as dynamic).expression.toString())) !=
             isNot) {
           if (_renameTo != null) {
             var __renameTo =
                 (_renameTo as NamedExpression).expression.toString();
-            var renamedSource = handleRename?.call(
-                _source, __renameTo.substring(1, __renameTo.length - 1));
-            if (renamedSource != null) {
-              _renames[_source] = renamedSource;
+            var nameNode = handleRename?.call();
+            if (nameNode != null) {
+              _renames[CodeRange.formEntry(nameNode)] =
+                  __renameTo.substring(1, __renameTo.length - 1);
             }
           }
         } else {
-          _removes.add(_source);
+          _removes.add(CodeRange.formEntry(node));
         }
       }
     }
@@ -115,8 +139,7 @@ class _Visitor extends RecursiveAstVisitor<void> {
   visitClassDeclaration(ClassDeclaration node) {
     _handleNode(
       node,
-      handleRename: (source, renameTo) => source.replaceFirst(
-          'class ${node.name.toString()}', 'class $renameTo'),
+      handleRename: () => node.name,
     );
     super.visitClassDeclaration(node);
   }
@@ -125,9 +148,7 @@ class _Visitor extends RecursiveAstVisitor<void> {
   visitVariableDeclarationStatement(VariableDeclarationStatement node) {
     _handleNode(
       node.variables,
-      useParent: true,
-      handleRename: (source, renameTo) => source.replaceFirst(
-          node.variables.variables.first.name.toString(), renameTo),
+      handleRename: () => node.variables.variables.first.name,
     );
     super.visitVariableDeclarationStatement(node);
   }
@@ -136,8 +157,7 @@ class _Visitor extends RecursiveAstVisitor<void> {
   visitTopLevelVariableDeclaration(TopLevelVariableDeclaration node) {
     _handleNode(
       node,
-      handleRename: (source, renameTo) => source.replaceFirst(
-          node.variables.variables.first.name.toString(), renameTo),
+      handleRename: () => node.variables.variables.first.name,
     );
     super.visitTopLevelVariableDeclaration(node);
   }
@@ -146,8 +166,7 @@ class _Visitor extends RecursiveAstVisitor<void> {
   visitFieldDeclaration(FieldDeclaration node) {
     _handleNode(
       node,
-      handleRename: (source, renameTo) => source.replaceFirst(
-          node.fields.variables.first.name.toString(), renameTo),
+      handleRename: () => node.fields.variables.first.name,
     );
     super.visitFieldDeclaration(node);
   }
@@ -156,8 +175,11 @@ class _Visitor extends RecursiveAstVisitor<void> {
   visitImportDirective(ImportDirective node) {
     _handleNode(
       node,
-      handleRename: (source, renameTo) =>
-          source.replaceFirst(node.uri.toSource(), "'$renameTo'"),
+      handleRename: () {
+        var literal = (node.uri as SimpleStringLiteral).literal;
+        var uriString = literal.toString().substring(1, literal.length - 1);
+        return StringToken(TokenType.STRING, uriString, literal.offset + 1);
+      },
     );
     super.visitImportDirective(node);
   }
@@ -166,8 +188,7 @@ class _Visitor extends RecursiveAstVisitor<void> {
   visitFunctionDeclaration(FunctionDeclaration node) {
     _handleNode(
       node,
-      handleRename: (source, renameTo) =>
-          source.replaceFirst(' ${node.name}(', ' $renameTo('),
+      handleRename: () => node.name,
     );
     super.visitFunctionDeclaration(node);
   }
@@ -176,8 +197,7 @@ class _Visitor extends RecursiveAstVisitor<void> {
   visitMethodDeclaration(MethodDeclaration node) {
     _handleNode(
       node,
-      handleRename: (source, renameTo) =>
-          source.replaceFirst(' ${node.name}(', ' $renameTo('),
+      handleRename: () => node.name,
     );
     super.visitMethodDeclaration(node);
   }
