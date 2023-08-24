@@ -141,7 +141,7 @@ union_types:
 5. 定义完成后，在项目根目录依次如下命令：
     ```shell
     dart pub get
-    ddart run build_runner build
+    dart run build_runner build
     ```
    完成后请检查生成的`platform_code_builder/lib/platform_type.dart`文件内容无误
 6. 在项目源码中使用注解标记不同平台下的代码，参考[注解使用说明](#注解使用说明)
@@ -155,5 +155,5 @@ union_types:
     }
 
     ```
-8. 运行`ddart run build_runner build`或`ddart run build_runner watch`，并将项目中相关的import源码路径更改为生成的`*.p.dart`
+8. 运行` run build_runner build`或`dart run build_runner watch`，并将项目中相关的import源码路径更改为生成的`*.p.dart`
 9. 运行Flutter/Dart项目，检查结果是否符合预期
