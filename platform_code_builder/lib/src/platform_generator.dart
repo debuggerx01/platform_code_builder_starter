@@ -41,6 +41,8 @@ class CodeRange {
         entry.offset,
         entry.end,
       );
+
+  bool contains(CodeRange other) => offset <= other.offset && end >= other.end;
 }
 
 class PlatformGenerator extends GeneratorForAnnotation<PlatformDetector> {
@@ -86,7 +88,12 @@ class PlatformGenerator extends GeneratorForAnnotation<PlatformDetector> {
 
     var keys = _visitor._renames.keys.sorted((a, b) => b.end.compareTo(a.end));
 
+    CodeRange? lastBigRange;
     for (var key in keys) {
+      if (lastBigRange?.contains(key) == true) {
+        continue;
+      }
+      lastBigRange = key;
       res = res.replaceRange(key.offset, key.end, _visitor._renames[key]!);
     }
     return res;
