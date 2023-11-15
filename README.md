@@ -2,6 +2,11 @@
 
 利用`source_gen`自定义代码生成器，解决跨平台开发时差异代码替换的问题。
 
+详细说明及分析请看：
+- [在 flutter 中利用 source_gen 实现条件编译（上）](https://www.debuggerx.com/2022/04/17/conditional-compilation-using-source-gen-in-flutter-1/)
+- [在 flutter 中利用 source_gen 实现条件编译（中）](https://www.debuggerx.com/2022/06/19/conditional-compilation-using-source-gen-in-flutter-2/)
+- [在 flutter 中利用 source_gen 实现条件编译（下）](https://www.debuggerx.com/2023/06/20/conditional-compilation-using-source-gen-in-flutter-3/)
+
 # DEMO使用方法
 
 1. clone本仓库
